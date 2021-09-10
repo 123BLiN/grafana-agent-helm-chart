@@ -36,10 +36,6 @@ securityContext:
       - ALL
   allowPrivilegeEscalation: false
 
-service:
-  type: ClusterIP
-  port: 80
-
 daemonset:
   minReadySeconds: 10
 
