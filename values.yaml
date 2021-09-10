@@ -1,0 +1,140 @@
+# Default values for grafana-agent.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: grafana/agent
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v0.18.2"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  runAsUser: 0
+  runAsGroup: 0
+
+securityContext:
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 80
+
+daemonset:
+  minReadySeconds: 10
+
+rbac:
+  create: true
+
+updateStrategy:
+  type: RollingUpdate
+
+resources:
+  {}
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Extra args for the Promtail container.
+extraArgs: []
+# -- Example:
+# -- extraArgs:
+# --   - -client.external-labels=hostname=$(HOSTNAME)
+
+# -- Extra environment variables
+extraEnv: []
+
+# -- Extra environment variables from secrets or configmaps
+extraEnvFrom: []
+
+config:
+  agent: |
+    server:
+      http_listen_port: 8080
+      log_level: info
+    tempo:
+      configs:
+        - batch:
+            send_batch_size: 1000
+            timeout: 5s
+          name: default
+          receivers:
+            jaeger:
+              protocols:
+                grpc:
+                thrift_binary: null
+                thrift_compact: null
+                thrift_http: null
+            zipkin:
+            otlp:
+              protocols:
+                grpc: null
+                http: null
+              remote_sampling:
+                insecure: true
+                strategy_file: /etc/agent/strategies.json
+            opencensus: null
+            otlp:
+              protocols:
+                grpc: null
+                http: null
+            zipkin: null
+          remote_write:
+            - basic_auth:
+                password: ${TEMPO_PASSWORD}
+                username: ${TEMPO_USERNAME}
+              endpoint: ${TEMPO_ENDPOINT}
+              retry_on_failure:
+                enabled: false
+          scrape_configs:
+            - bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+              job_name: kubernetes-pods
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - action: replace
+                  source_labels:
+                    - __meta_kubernetes_namespace
+                  target_label: namespace
+                - action: replace
+                  source_labels:
+                    - __meta_kubernetes_pod_name
+                  target_label: pod
+                - action: replace
+                  source_labels:
+                    - __meta_kubernetes_pod_container_name
+                  target_label: container
+              tls_config:
+                ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                insecure_skip_verify: false
+
+  strategies: '{"default_strategy": {"param": 0.001, "type": "probabilistic"}}'
